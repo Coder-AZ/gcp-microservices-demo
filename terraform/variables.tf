@@ -45,3 +45,23 @@ variable "memorystore" {
   type        = bool
   description = "If true, Online Boutique's in-cluster Redis cache will be replaced with a Google Cloud Memorystore Redis cache"
 }
+
+variable "cloudflare_tunnel_token" {
+  type        = string
+  description = "Cloudflare Tunnel token for the cloudflared connector. When set, a Kubernetes Secret named 'cloudflared' is created. Since the public frontend LoadBalancer is disabled, this is the app's ingress path. Leave empty to skip."
+  default     = ""
+  sensitive   = true
+}
+
+variable "datadog_api_key" {
+  type        = string
+  description = "Datadog API key. When set, a 'datadog-secret' Secret is created and the Datadog Agent Helm release is installed. Leave empty to skip Datadog."
+  default     = ""
+  sensitive   = true
+}
+
+variable "datadog_site" {
+  type        = string
+  description = "Datadog site to send data to (e.g. datadoghq.com, datadoghq.eu, us5.datadoghq.com)."
+  default     = "datadoghq.com"
+}

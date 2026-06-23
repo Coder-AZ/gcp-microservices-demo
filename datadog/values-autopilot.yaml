@@ -1,0 +1,43 @@
+# Datadog Agent Helm values tuned for GKE Autopilot.
+#
+# Why Helm (and not a kustomize component): GKE Autopilot restricts privileged
+# DaemonSets and host access, so Datadog must be installed with Autopilot-aware
+# defaults that the official chart sets for you when `providers.gke.autopilot`
+# is true. Hand-rolled DaemonSet manifests are brittle on Autopilot, so we use
+# the supported chart. See ./README.md for install steps.
+#
+# The Datadog API key is read from an existing Secret named `datadog-secret`
+# (key `api-key`) so the key never lives in this file or in git.
+
+datadog:
+  # Site of your Datadog org: datadoghq.com (US1), datadoghq.eu, us3.datadoghq.com,
+  # us5.datadoghq.com, ap1.datadoghq.com, ddog-gov.com. Override at install time
+  # with --set datadog.site=... if needed.
+  site: datadoghq.com
+  apiKeyExistingSecret: datadog-secret
+  clusterName: online-boutique
+
+  # On Autopilot the kubelet cert is not in the node's trust store; required.
+  kubelet:
+    tlsVerify: false
+
+  # Telemetry we want for the demo.
+  logs:
+    enabled: true
+    containerCollectAll: true
+  apm:
+    portEnabled: true
+  processAgent:
+    enabled: true
+    processCollection: true
+
+# Tells the chart to apply GKE Autopilot-compatible settings (priority class,
+# resource requests, dropped host mounts, etc.).
+providers:
+  gke:
+    autopilot: true
+
+# The cluster agent provides cluster-level metrics and reduces API server load.
+clusterAgent:
+  enabled: true
+  replicas: 1

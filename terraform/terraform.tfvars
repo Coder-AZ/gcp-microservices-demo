@@ -12,6 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-gcp_project_id = "<project_id_here>"
+gcp_project_id = "ashish-project-495421"
 
 memorystore = false
+
+# Cloudflare Tunnel token. Required to reach the app, since the public frontend
+# LoadBalancer is disabled (internal-only). Leave empty to deploy without ingress.
+# Treat as a secret — do not commit a real value.
+cloudflare_tunnel_token = ""
+
+# Datadog. Set the API key to install the Datadog Agent (requires `helm` CLI).
+# Leave empty to skip Datadog. Treat as a secret — do not commit a real value.
+datadog_api_key = ""
+datadog_site    = "datadoghq.com"

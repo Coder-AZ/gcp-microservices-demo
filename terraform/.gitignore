@@ -1,0 +1,10 @@
+# Local Terraform state, plugin cache, and crash logs
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Never commit real secret values placed in tfvars
+*.auto.tfvars
+secrets.tfvars

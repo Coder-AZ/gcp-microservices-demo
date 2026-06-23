@@ -49,9 +49,10 @@ resource "google_container_cluster" "my_cluster" {
   ip_allocation_policy {
   }
 
-  # Avoid setting deletion_protection to false
-  # until you're ready (and certain you want) to destroy the cluster.
-  # deletion_protection = false
+  # Demo workflow: this cluster is meant to be created for a demo and destroyed
+  # afterwards, so deletion protection is disabled to allow `terraform destroy`.
+  # Set back to true (or remove) for any long-lived/production cluster.
+  deletion_protection = false
 
   depends_on = [
     module.enable_google_apis
@@ -72,6 +73,56 @@ module "gcloud" {
   create_cmd_body = "container clusters get-credentials ${local.cluster_name} --zone=${var.region} --project=${var.gcp_project_id}"
 }
 
+# Create the Secret consumed by the cloudflared tunnel Deployment.
+# Idempotent: re-applies the Secret on every run. Skipped when no token is set.
+resource "null_resource" "cloudflared_secret" {
+  count = var.cloudflare_tunnel_token != "" ? 1 : 0
+
+  triggers = {
+    token_sha = sha256(var.cloudflare_tunnel_token)
+    namespace = var.namespace
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["bash", "-exc"]
+    command     = <<-EOT
+    kubectl create secret generic cloudflared \
+      --from-literal=tunnel-token='${var.cloudflare_tunnel_token}' \
+      -n ${var.namespace} \
+      --dry-run=client -o yaml | kubectl apply -f -
+    EOT
+  }
+
+  depends_on = [
+    module.gcloud
+  ]
+}
+
+# Create the Secret consumed by the Datadog Agent (see datadog.tf).
+# Idempotent. Skipped when no API key is set.
+resource "null_resource" "datadog_secret" {
+  count = var.datadog_api_key != "" ? 1 : 0
+
+  triggers = {
+    key_sha   = sha256(var.datadog_api_key)
+    namespace = var.namespace
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["bash", "-exc"]
+    command     = <<-EOT
+    kubectl create secret generic datadog-secret \
+      --from-literal=api-key='${var.datadog_api_key}' \
+      -n ${var.namespace} \
+      --dry-run=client -o yaml | kubectl apply -f -
+    EOT
+  }
+
+  depends_on = [
+    module.gcloud
+  ]
+}
+
 # Apply YAML kubernetes-manifest configurations
 resource "null_resource" "apply_deployment" {
   provisioner "local-exec" {
@@ -80,7 +131,9 @@ resource "null_resource" "apply_deployment" {
   }
 
   depends_on = [
-    module.gcloud
+    module.gcloud,
+    null_resource.cloudflared_secret,
+    null_resource.datadog_secret
   ]
 }
 
