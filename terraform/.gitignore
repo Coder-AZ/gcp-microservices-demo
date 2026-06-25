@@ -5,6 +5,9 @@
 *.tfstate.*
 crash.log
 
-# Never commit real secret values placed in tfvars
+# Never commit real secret values. Secrets are supplied via environment
+# variables; the committed template is secrets.env.example, the filled-in copy
+# (secrets.env) is not. Legacy *.auto.tfvars / secrets.tfvars stay ignored too.
+secrets.env
 *.auto.tfvars
 secrets.tfvars

@@ -38,6 +38,16 @@ This page walks you through the steps required to deploy the [Online Boutique](h
 
 1. (Optional) If you want to provision a [Google Cloud Memorystore (Redis)](https://cloud.google.com/memorystore) instance, you can change the value of `memorystore = false` to `memorystore = true` in this `terraform.tfvars` file.
 
+1. Provide the deployment secrets as environment variables — they are not stored in any committed file. Copy the template, fill it in, and load it into your shell:
+
+    ```bash
+    cp secrets.env.example secrets.env   # secrets.env is gitignored
+    # edit secrets.env: set your Cloudflare Tunnel token (and optional Datadog API key)
+    source secrets.env
+    ```
+
+    Terraform reads these as `TF_VAR_cloudflare_tunnel_token` / `TF_VAR_datadog_api_key`. The Cloudflare Tunnel token is **required** for this internal-only variant — it removes the public frontend LoadBalancer, so the tunnel is the app's only ingress. The Datadog API key is optional (leave empty to skip Datadog).
+
 1. Initialize Terraform.
 
     ```bash

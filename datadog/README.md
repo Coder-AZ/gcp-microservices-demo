@@ -24,9 +24,9 @@ kubectl create secret generic datadog-secret \
   -n default
 ```
 
-> If you deploy with the bundled Terraform, set `datadog_api_key` in
-> `terraform/terraform.tfvars` instead and both the Secret and the Helm release
-> are created for you (see `terraform/datadog.tf`).
+> If you deploy with the bundled Terraform, export `TF_VAR_datadog_api_key`
+> (see `terraform/secrets.env.example`) instead and both the Secret and the Helm
+> release are created for you (see `terraform/datadog.tf`).
 
 ### 2. Install the chart
 

@@ -37,8 +37,9 @@ kubectl create secret generic cloudflared \
   -n default
 ```
 
-> If you deploy with the bundled Terraform, set `cloudflare_tunnel_token` in
-> `terraform/terraform.tfvars` instead and the Secret is created for you.
+> If you deploy with the bundled Terraform, export
+> `TF_VAR_cloudflare_tunnel_token` (see `terraform/secrets.env.example`) instead
+> and the Secret is created for you.
 
 ### 3. Enable the component
 
