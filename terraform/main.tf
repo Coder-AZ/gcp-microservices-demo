@@ -64,8 +64,13 @@ module "gcloud" {
   source  = "terraform-google-modules/gcloud/google"
   version = "~> 4.0"
 
-  platform              = "linux"
-  additional_components = ["kubectl", "beta"]
+  platform = "linux"
+  # Only ensure kubectl is present. The original upstream also requested the
+  # "beta" component, but installing it requires write access to the gcloud SDK
+  # dir (sudo) on Homebrew installs, and "beta" isn't needed for
+  # `container clusters get-credentials`. kubectl + gke-gcloud-auth-plugin are
+  # already available locally, so nothing is installed.
+  additional_components = ["kubectl"]
 
   create_cmd_entrypoint = "gcloud"
   # Module does not support explicit dependency
@@ -137,13 +142,27 @@ resource "null_resource" "apply_deployment" {
   ]
 }
 
-# Wait condition for all Pods to be ready before finishing
+# Wait condition for workloads to be ready before finishing.
+# Hardened for GKE Autopilot:
+#   - The metrics-server APIService registers a few minutes after the first
+#     nodes scale, and `kubectl wait` errors immediately on a resource that does
+#     not exist yet. So poll for its existence first, then wait for AVAILABLE.
+#     This step is non-fatal — app readiness below is the real gate.
+#   - Wait on Deployments becoming Available rather than every Pod becoming
+#     Ready. This covers the Online Boutique app and the Datadog control plane
+#     while excluding the Datadog node-Agent DaemonSet, whose pods can stay
+#     Pending on Autopilot nodes that lack spare CPU — a benign state that must
+#     not fail the apply.
 resource "null_resource" "wait_conditions" {
   provisioner "local-exec" {
     interpreter = ["bash", "-exc"]
     command     = <<-EOT
-    kubectl wait --for=condition=AVAILABLE apiservice/v1beta1.metrics.k8s.io --timeout=180s
-    kubectl wait --for=condition=ready pods --all -n ${var.namespace} --timeout=280s
+    for i in $(seq 1 30); do
+      kubectl get apiservice v1beta1.metrics.k8s.io >/dev/null 2>&1 && break
+      sleep 10
+    done
+    kubectl wait --for=condition=AVAILABLE apiservice/v1beta1.metrics.k8s.io --timeout=180s || true
+    kubectl wait --for=condition=Available deployments --all -n ${var.namespace} --timeout=300s
     EOT
   }
 
