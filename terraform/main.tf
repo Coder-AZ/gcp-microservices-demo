@@ -49,9 +49,10 @@ resource "google_container_cluster" "my_cluster" {
   ip_allocation_policy {
   }
 
-  # Avoid setting deletion_protection to false
-  # until you're ready (and certain you want) to destroy the cluster.
-  # deletion_protection = false
+  # Demo workflow: this cluster is meant to be created for a demo and destroyed
+  # afterwards, so deletion protection is disabled to allow `terraform destroy`.
+  # Set back to true (or remove) for any long-lived/production cluster.
+  deletion_protection = false
 
   depends_on = [
     module.enable_google_apis
@@ -63,13 +64,68 @@ module "gcloud" {
   source  = "terraform-google-modules/gcloud/google"
   version = "~> 4.0"
 
-  platform              = "linux"
-  additional_components = ["kubectl", "beta"]
+  platform = "linux"
+  # Only ensure kubectl is present. The original upstream also requested the
+  # "beta" component, but installing it requires write access to the gcloud SDK
+  # dir (sudo) on Homebrew installs, and "beta" isn't needed for
+  # `container clusters get-credentials`. kubectl + gke-gcloud-auth-plugin are
+  # already available locally, so nothing is installed.
+  additional_components = ["kubectl"]
 
   create_cmd_entrypoint = "gcloud"
   # Module does not support explicit dependency
   # Enforce implicit dependency through use of local variable
   create_cmd_body = "container clusters get-credentials ${local.cluster_name} --zone=${var.region} --project=${var.gcp_project_id}"
+}
+
+# Create the Secret consumed by the cloudflared tunnel Deployment.
+# Idempotent: re-applies the Secret on every run. Skipped when no token is set.
+resource "null_resource" "cloudflared_secret" {
+  count = var.cloudflare_tunnel_token != "" ? 1 : 0
+
+  triggers = {
+    token_sha = sha256(var.cloudflare_tunnel_token)
+    namespace = var.namespace
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["bash", "-exc"]
+    command     = <<-EOT
+    kubectl create secret generic cloudflared \
+      --from-literal=tunnel-token='${var.cloudflare_tunnel_token}' \
+      -n ${var.namespace} \
+      --dry-run=client -o yaml | kubectl apply -f -
+    EOT
+  }
+
+  depends_on = [
+    module.gcloud
+  ]
+}
+
+# Create the Secret consumed by the Datadog Agent (see datadog.tf).
+# Idempotent. Skipped when no API key is set.
+resource "null_resource" "datadog_secret" {
+  count = var.datadog_api_key != "" ? 1 : 0
+
+  triggers = {
+    key_sha   = sha256(var.datadog_api_key)
+    namespace = var.namespace
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["bash", "-exc"]
+    command     = <<-EOT
+    kubectl create secret generic datadog-secret \
+      --from-literal=api-key='${var.datadog_api_key}' \
+      -n ${var.namespace} \
+      --dry-run=client -o yaml | kubectl apply -f -
+    EOT
+  }
+
+  depends_on = [
+    module.gcloud
+  ]
 }
 
 # Apply YAML kubernetes-manifest configurations
@@ -80,17 +136,33 @@ resource "null_resource" "apply_deployment" {
   }
 
   depends_on = [
-    module.gcloud
+    module.gcloud,
+    null_resource.cloudflared_secret,
+    null_resource.datadog_secret
   ]
 }
 
-# Wait condition for all Pods to be ready before finishing
+# Wait condition for workloads to be ready before finishing.
+# Hardened for GKE Autopilot:
+#   - The metrics-server APIService registers a few minutes after the first
+#     nodes scale, and `kubectl wait` errors immediately on a resource that does
+#     not exist yet. So poll for its existence first, then wait for AVAILABLE.
+#     This step is non-fatal — app readiness below is the real gate.
+#   - Wait on Deployments becoming Available rather than every Pod becoming
+#     Ready. This covers the Online Boutique app and the Datadog control plane
+#     while excluding the Datadog node-Agent DaemonSet, whose pods can stay
+#     Pending on Autopilot nodes that lack spare CPU — a benign state that must
+#     not fail the apply.
 resource "null_resource" "wait_conditions" {
   provisioner "local-exec" {
     interpreter = ["bash", "-exc"]
     command     = <<-EOT
-    kubectl wait --for=condition=AVAILABLE apiservice/v1beta1.metrics.k8s.io --timeout=180s
-    kubectl wait --for=condition=ready pods --all -n ${var.namespace} --timeout=280s
+    for i in $(seq 1 30); do
+      kubectl get apiservice v1beta1.metrics.k8s.io >/dev/null 2>&1 && break
+      sleep 10
+    done
+    kubectl wait --for=condition=AVAILABLE apiservice/v1beta1.metrics.k8s.io --timeout=180s || true
+    kubectl wait --for=condition=Available deployments --all -n ${var.namespace} --timeout=300s
     EOT
   }
 

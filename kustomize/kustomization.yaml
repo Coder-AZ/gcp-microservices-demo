@@ -17,11 +17,15 @@ kind: Kustomization
 resources:
 - base
 components:
+# Internal-only frontend: removes the public LoadBalancer / public IP.
+- components/non-public-frontend
+# Cloudflare Tunnel: exposes the internal frontend via your Cloudflare domain
+# (HTTPS, no public IP). Requires a `cloudflared` Secret — see the component README.
+- components/cloudflared
 # - components/cymbal-branding
 # - components/google-cloud-operations
 # - components/memorystore
 # - components/network-policies
-# - components/non-public-frontend
 # - components/service-accounts
 # - components/alloydb
 # - components/single-shared-session
