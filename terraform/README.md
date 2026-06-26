@@ -48,6 +48,19 @@ This page walks you through the steps required to deploy the [Online Boutique](h
 
     Terraform reads these as `TF_VAR_cloudflare_tunnel_token` / `TF_VAR_datadog_api_key`. The Cloudflare Tunnel token is **required** for this internal-only variant — it removes the public frontend LoadBalancer, so the tunnel is the app's only ingress. The Datadog API key is optional (leave empty to skip Datadog).
 
+    > **Future option — Google Secret Manager.** Both secrets are only supplied
+    > once at `terraform apply` for a short-lived demo, so environment variables
+    > are sufficient here. If this deploy is later shared across a team or run
+    > from CI, the lightweight upgrade is to store the two values in
+    > [Google Secret Manager](https://cloud.google.com/secret-manager) (created
+    > out-of-band with `gcloud secrets create`) and have Terraform read them via
+    > `data "google_secret_manager_secret_version"` instead of env vars — a few
+    > data sources plus a `roles/secretmanager.secretAccessor` grant, with no
+    > changes to the workloads. The heavier Secret Manager CSI driver +
+    > Workload Identity pattern (pods reading Secret Manager directly) is real
+    > best practice for production but unnecessary for a destroy-after-demo
+    > cluster.
+
 1. Initialize Terraform.
 
     ```bash
