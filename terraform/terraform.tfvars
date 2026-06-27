@@ -12,20 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-gcp_project_id = "ashish-project-495421"
-
-memorystore = false
-
-# Secrets (cloudflare_tunnel_token, datadog_api_key) are intentionally NOT set
-# here. Provide them as environment variables so real values never land in a
-# committed file:
+# The GCP project ID and secrets are supplied via environment variables (a
+# standard Terraform pattern) rather than set here:
 #
+#   export TF_VAR_gcp_project_id=...            # required
 #   export TF_VAR_cloudflare_tunnel_token=...   # required: the app's ingress
 #   export TF_VAR_datadog_api_key=...           # optional: enables Datadog
 #
 # Copy terraform/secrets.env.example to terraform/secrets.env (gitignored), fill
-# it in, and `source` it before running terraform. When a TF_VAR_ var is unset,
-# the variable defaults to "" and the corresponding feature is skipped.
+# it in, and `source` it before running terraform. Optional unset vars default
+# to "" and skip their feature; gcp_project_id is required.
+
+memorystore = false
 
 # Datadog site is not a secret, so it can live here. Adjust for your account
 # (e.g. us5.datadoghq.com, datadoghq.eu).

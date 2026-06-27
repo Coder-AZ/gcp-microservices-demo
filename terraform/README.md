@@ -34,19 +34,17 @@ This page walks you through the steps required to deploy the [Online Boutique](h
     cd microservices-demo/terraform
     ```
 
-1. Open the `terraform.tfvars` file and replace `<project_id_here>` with the [GCP Project ID](https://cloud.google.com/resource-manager/docs/creating-managing-projects?hl=en#identifying_projects) for the `gcp_project_id` variable.
+1. (Optional) If you want to provision a [Google Cloud Memorystore (Redis)](https://cloud.google.com/memorystore) instance, you can change the value of `memorystore = false` to `memorystore = true` in the `terraform.tfvars` file.
 
-1. (Optional) If you want to provision a [Google Cloud Memorystore (Redis)](https://cloud.google.com/memorystore) instance, you can change the value of `memorystore = false` to `memorystore = true` in this `terraform.tfvars` file.
-
-1. Provide the deployment secrets as environment variables — they are not stored in any committed file. Copy the template, fill it in, and load it into your shell:
+1. Provide your [GCP Project ID](https://cloud.google.com/resource-manager/docs/creating-managing-projects?hl=en#identifying_projects) and the deployment secrets as environment variables (supplied at deploy time rather than hard-coded). Copy the template, fill it in, and load it into your shell:
 
     ```bash
     cp secrets.env.example secrets.env   # secrets.env is gitignored
-    # edit secrets.env: set your Cloudflare Tunnel token (and optional Datadog API key)
+    # edit secrets.env: set TF_VAR_gcp_project_id, your Cloudflare Tunnel token (and optional Datadog API key)
     source secrets.env
     ```
 
-    Terraform reads these as `TF_VAR_cloudflare_tunnel_token` / `TF_VAR_datadog_api_key`. The Cloudflare Tunnel token is **required** for this internal-only variant — it removes the public frontend LoadBalancer, so the tunnel is the app's only ingress. The Datadog API key is optional (leave empty to skip Datadog).
+    Terraform reads these as `TF_VAR_gcp_project_id` / `TF_VAR_cloudflare_tunnel_token` / `TF_VAR_datadog_api_key`. The project ID and the Cloudflare Tunnel token are **required** — the tunnel is the only ingress for this internal-only variant, which removes the public frontend LoadBalancer. The Datadog API key is optional (leave empty to skip Datadog).
 
     > **Future option — Google Secret Manager.** Both secrets are only supplied
     > once at `terraform apply` for a short-lived demo, so environment variables
